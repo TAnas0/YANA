@@ -136,3 +136,28 @@ def fetch_aljazeera_stories():
     return stories
 
 
+
+def aggregate_news():
+    all_stories = []
+    all_stories.extend(fetch_aljazeera_stories())
+    all_stories.extend(fetch_yahoo_stories())
+    all_stories.extend(fetch_cbc_stories())
+    all_stories.extend(fetch_rt_stories())
+    all_stories.extend(fetch_sky_news_stories())
+    all_stories.extend(fetch_new_york_times_stories())
+    all_stories.extend(fetch_cnn_stories())
+    all_stories.extend(fetch_cnbc_stories())
+    all_stories.extend(fetch_guardian_stories())
+    
+    details = compare_news_stories_by_entities(list(set(all_stories)))
+    details = compare_news_stories(list(set(all_stories)))
+    return all_stories
+
+
+if __name__ == "__main__":
+    while True:
+        news_stories = aggregate_news()
+        for story in news_stories:
+            print(story)
+            print("=" * 50)
+        time.sleep(60)
