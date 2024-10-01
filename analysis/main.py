@@ -26,3 +26,32 @@ def extract_all(news_story: NewsStory):
         # "datetimes": datetimes,
     }
 
+
+def compare_news_stories(news_stories: [NewsStory]):
+    """Groups news articles dealing with the same event, people, etc.
+
+    BETTER SUITED FOR FURTHER READINGS
+
+    # TODO Maybe generate a matrix of similarity?
+    """
+    texts = [" ".join(filter(None, [news_story.title, news_story.summary, news_story.content])) for news_story in news_stories]
+
+    # Step 1: Calculate Cosine Similarity
+    vectorizer = TfidfVectorizer(stop_words='english')
+    tfidf_matrix = vectorizer.fit_transform(texts)
+    similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
+
+    grouped_articles = {}
+    threshold = 0.4
+    for i in range(len(news_stories)):
+        # Find articles similar to the current article
+        similar_indices = [j for j in range(len(news_stories)) if similarity_matrix[i][j] > threshold and i != j]
+
+        # If similar articles are found, create a group
+        if similar_indices:
+            # Create a unique key for the current article
+            # key = f"Article {i}: {news_stories[i].title}"
+            grouped_articles[str(news_stories[i])] = [news_stories[j] for j in similar_indices]
+    
+    return grouped_articles
+
