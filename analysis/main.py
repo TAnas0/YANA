@@ -5,6 +5,8 @@ from models import NewsStory
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+# Load the spaCy English model
+nlp = spacy.load("en_core_web_sm")
 
 
 def extract_all(news_story: NewsStory):
