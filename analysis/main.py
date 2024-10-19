@@ -4,6 +4,7 @@ import spacy
 from models import NewsStory
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+from nltk.corpus import wordnet
 
 # Load the spaCy English model
 nlp = spacy.load("en_core_web_sm")
@@ -70,12 +71,23 @@ def extract_all_named_entities(news_story: NewsStory):
     }
 
 
-def compare_news_stories(news_stories: [NewsStory]):
-    """Groups news articles dealing with the same event, people, etc.
+def get_canonical_synonym(word):
+    synsets = wordnet.synsets(word)
+    if word.lower() == "russia": # Converted wrongly to Soviet_Union
+        return word
+    if synsets:
+        # Get the first lemma (canonical form) of the first synset (sense of the word)
+        return synsets[0].lemmas()[0].name().replace("_", " ")
+    return word
 
-    BETTER SUITED FOR FURTHER READINGS
+def text_turn_to_canonical_roots(text):
+    # For all entities in a text, turn them to the root canonical synonym
+    doc = nlp(text)
 
-    # TODO Maybe generate a matrix of similarity?
+    for entity in doc.ents:
+        text = text.replace(entity.text, get_canonical_synonym(entity.text)) # TODO fix. should only replace full words, not all occurences (for example "US")
+    return text
+
     """
     texts = [" ".join(filter(None, [news_story.title, news_story.summary, news_story.content])) for news_story in news_stories]
 
