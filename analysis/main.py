@@ -8,9 +8,51 @@ from sklearn.metrics.pairwise import cosine_similarity
 # Load the spaCy English model
 nlp = spacy.load("en_core_web_sm")
 
+def extract_locations(news_story: NewsStory):
+    """Extracts the identified locations from title, summary, or content"""
+    # Combine text fields for analysis
+    text = " ".join(filter(None, [news_story.title, news_story.summary, news_story.content]))
+        
+    # Apply spaCy NLP pipeline
+    doc = nlp(text)
+    
+    # Find location entities (GPE = Geopolitical Entity)
+    gpes = []
+    for ent in doc.ents:
+        if ent.label_ in ["GPE", "LOC"] and ent.text.lower() not in gpes:  # GPE indicates countries, cities, states
+            gpes.append(ent.text.lower())
 
-def extract_all(news_story: NewsStory):
-    """Extracts names of people from the given text."""
+    return gpes
+
+
+def extract_names(news_story: NewsStory):
+    """Extracts names of people from the given text"""
+    text = " ".join(filter(None, [news_story.title, news_story.summary, news_story.content]))
+    doc = nlp(text)
+    names = [ent.text.lower() for ent in doc.ents if ent.label_ == "PERSON"]
+    return names
+
+
+def extract_all_named_entities(news_story: NewsStory):
+    """
+    Extracts named entities from a news story using natural language processing (NLP).
+
+    This function processes the combined text of the news story's title, summary, and content
+    to extract various types of named entities, including:
+    
+    - **names**: People mentioned in the text (labeled as `PERSON`).
+    - **locations**: Geographic locations, including countries, cities, and other geographical entities 
+      (labeled as `GPE` or `LOC`).
+    - **orgs**: Organizations mentioned in the text (labeled as `ORG`).
+    - **events**: Named events, such as conferences, wars, or major incidents (labeled as `EVENT`).
+    - **products**: Products mentioned, such as devices or services (labeled as `PRODUCT`).
+    
+    Args:
+        news_story (NewsStory): An object containing the title, summary, and content of a news story.
+
+    Returns:
+        dict: A dictionary containing lists of extracted named entities, categorized by type:
+    """
     text = " ".join(filter(None, [news_story.title, news_story.summary, news_story.content]))
     doc = nlp(text)
     names = [ent.text.lower() for ent in doc.ents if ent.label_ == "PERSON"]
@@ -18,7 +60,6 @@ def extract_all(news_story: NewsStory):
     orgs = [ent.text.lower() for ent in doc.ents if ent.label_ == "ORG"]
     events = [ent.text.lower() for ent in doc.ents if ent.label_ == "EVENT"]
     products = [ent.text.lower() for ent in doc.ents if ent.label_ == "PRODUCT"]
-    # datetimes = [ent.text.lower() for ent in doc.ents if ent.label_ in ["DATE", "TIME"]]
     return {
         "names": names,
         "locations": locations,
