@@ -2,13 +2,22 @@
 import numpy as np
 import spacy
 from models import NewsStory
-from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+import itertools
+from analysis.clean import remove_html
+from analysis.utils import remove_elements
+from sklearn.cluster import DBSCAN
 from nltk.corpus import wordnet
+
 
 # Load the spaCy English model
 nlp = spacy.load("en_core_web_sm")
 
+
+#################################
+## Named Entities
+#################################
 def extract_locations(news_story: NewsStory):
     """Extracts the identified locations from title, summary, or content"""
     # Combine text fields for analysis
@@ -71,6 +80,10 @@ def extract_all_named_entities(news_story: NewsStory):
     }
 
 
+#################################
+## Semantic Analysis
+#################################
+
 def get_canonical_synonym(word):
     synsets = wordnet.synsets(word)
     if word.lower() == "russia": # Converted wrongly to Soviet_Union
@@ -92,49 +105,39 @@ def text_turn_to_canonical_roots(text):
 ## Comparing NewsStories
 ##################################
 
-def compare_news_stories(news_stories: [NewsStory], strategy: str = "count", threshold: float = 0.5):
+def cluster_news_stories(news_stories: [NewsStory], strategy: str = "count"):
     """
     Groups news articles dealing with the same event, people, etc.
     """
-    texts = [" ".join(filter(None, [news_story.title, news_story.summary, news_story.content])) for news_story in news_stories]
+    if strategy == "count":
+        vectorizer = CountVectorizer()
+    if strategy == "tf_idf":
+        vectorizer = TfidfVectorizer(stop_words='english')
+    else:
+        raise ValueError(f"Specified strategy not supported: {strategy}")
 
-    # Step 1: Calculate Cosine Similarity
-    vectorizer = TfidfVectorizer(stop_words='english')
-    tfidf_matrix = vectorizer.fit_transform(texts)
-    similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
+    story_preprocessed_text = [story.preprocess_text() for story in news_stories]
+    matrix = vectorizer.fit_transform(story_preprocessed_text)
+    similarity_matrix = cosine_similarity(matrix, matrix)
 
-    grouped_articles = {}
-    threshold = 0.4
-    for i in range(len(news_stories)):
-        # Find articles similar to the current article
-        similar_indices = [j for j in range(len(news_stories)) if similarity_matrix[i][j] > threshold and i != j]
+    # Apply DBSCAN on the similarity matrix (treat similarity as a distance)
+    cluster_labels = cluster_with_dbscan(similarity_matrix, eps=0.8, min_samples=2)
 
-        # If similar articles are found, create a group
-        if similar_indices:
-            # Create a unique key for the current article
-            # key = f"Article {i}: {news_stories[i].title}"
-            grouped_articles[str(news_stories[i])] = [news_stories[j] for j in similar_indices]
-    
-    return grouped_articles
+    # The 'cluster_labels' will have the assigned cluster or -1 for noise/outliers
+    clusters = {}
+    for i, label in enumerate(cluster_labels):
+        if label not in clusters:
+            clusters[label] = []  # Initialize an empty list for this cluster
+        clusters[label].append(news_stories[i])  # Add the news story to the correct cluster
+
+    return clusters
 
 
-def compare_news_stories_by_entities(news_stories: [NewsStory]):
-    """Groups news articles dealing with the same event, people, etc.
-
-    BETTER SUITED FOR FURTHER READINGS
-
-    # TODO Maybe generate a matrix of similarity?
-    """
-    # texts = [" ".join([news_story.title, news_story.summary, news_story.content]) for news_story in news_stories]
-    story_entities = [extract_all(news_story) for news_story in news_stories]
-    story_entities_text = [' '.join(' '.join(value) for value in entities.values() if value) for entities in story_entities]
-    # Step 1: Calculate Cosine Similarity
-    vectorizer = TfidfVectorizer(stop_words='english')
-    tfidf_matrix = vectorizer.fit_transform(story_entities_text)
-    similarity_matrix = cosine_similarity(tfidf_matrix, tfidf_matrix)
-
-    grouped_articles = {}
-    threshold = 0.4
+def cluster_with_dbscan(similarity_matrix, eps, min_samples):
+    distance_matrix = np.maximum(1 - similarity_matrix, 0)
+    dbscan = DBSCAN(eps, min_samples, metric='precomputed')
+    cluster_labels = dbscan.fit_predict(distance_matrix)
+    return cluster_labels
 
 
 def name_group_of_news_stories(news_stories, top: int = 5):
@@ -152,6 +155,7 @@ def name_group_of_news_stories(news_stories, top: int = 5):
     combined_text = ' '.join([news_story.preprocess_text() for news_story in news_stories])
 
     vectorizer = TfidfVectorizer(stop_words='english', max_features=100)
+    # ! TF-IDF on a list of a single text? give multiple texts, or just use Count after removing stopwords
     matrix = vectorizer.fit_transform([combined_text])
     feature_names = vectorizer.get_feature_names_out()
     
@@ -165,3 +169,4 @@ def name_group_of_news_stories(news_stories, top: int = 5):
     return ", ".join(top_keywords)
 
 
+print()
