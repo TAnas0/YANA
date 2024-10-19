@@ -88,6 +88,13 @@ def text_turn_to_canonical_roots(text):
         text = text.replace(entity.text, get_canonical_synonym(entity.text)) # TODO fix. should only replace full words, not all occurences (for example "US")
     return text
 
+##################################
+## Comparing NewsStories
+##################################
+
+def compare_news_stories(news_stories: [NewsStory], strategy: str = "count", threshold: float = 0.5):
+    """
+    Groups news articles dealing with the same event, people, etc.
     """
     texts = [" ".join(filter(None, [news_story.title, news_story.summary, news_story.content])) for news_story in news_stories]
 
@@ -128,14 +135,33 @@ def compare_news_stories_by_entities(news_stories: [NewsStory]):
 
     grouped_articles = {}
     threshold = 0.4
-    for i in range(len(news_stories)):
-        # Find articles similar to the current article
-        similar_indices = [j for j in range(len(news_stories)) if similarity_matrix[i][j] > threshold and i != j]
 
-        # If similar articles are found, create a group
-        if similar_indices:
-            # Create a unique key for the current article
-            # key = f"Article {i}: {news_stories[i].title}"
-            grouped_articles[str(news_stories[i])] = [news_stories[j] for j in similar_indices]
+
+def name_group_of_news_stories(news_stories, top: int = 5):
+    """
+    Generate a name for a group of news stories based on the top N  keywords with the highest TF-IDF scores
+
+    Args:
+        news_stories (list): A list of news story objects, each containing text to be processed
+        top (int): The number of top keywords to return
+
+    Returns:
+        str: A string of the top N keywords, separated by commas, representing the main topics 
+        of the combined news stories
+    """
+    combined_text = ' '.join([news_story.preprocess_text() for news_story in news_stories])
+
+    vectorizer = TfidfVectorizer(stop_words='english', max_features=100)
+    matrix = vectorizer.fit_transform([combined_text])
+    feature_names = vectorizer.get_feature_names_out()
     
-    return grouped_articles
+    # Get the TF-IDF scores for the words
+    tfidf_scores = matrix.toarray().flatten()
+    
+    # Get the top N words based on their TF-IDF score
+    top_indices = tfidf_scores.argsort()[-top:][::-1]
+    top_keywords = [feature_names[index] for index in top_indices]
+    
+    return ", ".join(top_keywords)
+
+
